@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ai Speech Bot</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 700px; margin: 2rem auto; padding: 1rem; }
+    .card { border-radius: 12px; padding: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    #transcript, #reply { padding: 0.5rem; min-height: 2rem; background: #f8f8f8; border-radius: 8px; }
+    button { padding: 0.6rem 1rem; border-radius: 8px; border: none; margin: 0.3rem; cursor: pointer; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <h1>🎤 Ai Speech Bot</h1>
+  <div class="card">
+    <p>Click <strong>Start</strong>, ask your question, and I’ll answer out loud.</p>
+
+    <div>
+      <button id="startBtn">Start</button>
+      <button id="stopBtn" disabled>Stop</button>
+    </div>
+
+    <h3>Transcript</h3>
+    <div id="transcript"></div>
+
+    <h3>Bot Reply</h3>
+    <div id="reply"></div>
+
+    <h4>Sample Questions</h4>
+    <ul>
+      <li>What should we know about your life story in a few sentences?</li>
+      <li>What’s your superpower?</li>
+      <li>What are the top 3 areas you’d like to grow in?</li>
+      <li>What misconception do your coworkers have about you?</li>
+      <li>How do you push your boundaries and limits?</li>
+    </ul>
+  </div>
+
+<script>
+const startBtn = document.getElementById("startBtn");
+const stopBtn = document.getElementById("stopBtn");
+const transcriptEl = document.getElementById("transcript");
+const replyEl = document.getElementById("reply");
+
+let recognition = null;
+
+if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
+  transcriptEl.textContent = "❌ Speech Recognition not supported. Use Chrome or Edge.";
+  startBtn.disabled = true;
+}
+
+function getRecognition() {
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const r = new SpeechRec();
+  r.lang = "en-US";
+  r.interimResults = false;
+  r.maxAlternatives = 1;
+  return r;
+}
+
+startBtn.onclick = () => {
+  recognition = getRecognition();
+  startBtn.disabled = true;
+  stopBtn.disabled = false;
+  transcriptEl.textContent = "🎤 Listening...";
+
+  recognition.onresult = (event) => {
+    const text = event.results[0][0].transcript;
+    transcriptEl.textContent = text;
+    sendText(text);
+  };
+
+  recognition.onend = () => {
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+  };
+
+  recognition.onerror = (e) => {
+    transcriptEl.textContent = "Error: " + e.error;
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+  };
+
+  recognition.start();
+};
+
+// Stop both recognition and speech
+stopBtn.onclick = () => {
+  // Stop voice recognition
+  if (recognition) recognition.stop();
+
+  // Stop any ongoing speech synthesis
+  if ("speechSynthesis" in window && window.speechSynthesis.speaking) {
+    window.speechSynthesis.cancel();
+  }
+
+  startBtn.disabled = false;
+  stopBtn.disabled = true;
+};
+
+async function sendText(text) {
+  replyEl.textContent = "🤔 Thinking...";
+  const form = new FormData();
+  form.append("text", text);
+  try {
+    const resp = await fetch("/api/respond", { method: "POST", body: form });
+    const data = await resp.json();
+    replyEl.textContent = data.reply;
+    speak(data.reply);
+  } catch (err) {
+    replyEl.textContent = "Error: " + err;
+  }
+}
+
+function speak(text) {
+  if (!("speechSynthesis" in window)) return;
+  const u = new SpeechSynthesisUtterance(text);
+  window.speechSynthesis.cancel(); // stop any ongoing speech first
+  window.speechSynthesis.speak(u);
+}
+</script>
+</body>
+</html>
